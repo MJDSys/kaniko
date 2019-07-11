@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"sort"
 	"syscall"
 
 	"github.com/GoogleContainerTools/kaniko/pkg/timing"
@@ -47,8 +48,8 @@ func NewSnapshotter(l *LayeredMap, d string) *Snapshotter {
 }
 
 // Init initializes a new snapshotter
-func (s *Snapshotter) Init() error {
-	_, _, err := s.scanFullFilesystem()
+func (s *Snapshotter) Init(reproducible bool) error {
+	_, _, err := s.scanFullFilesystem(reproducible)
 	return err
 }
 
@@ -94,7 +95,7 @@ func (s *Snapshotter) TakeSnapshot(files []string) (string, error) {
 
 // TakeSnapshotFS takes a snapshot of the filesystem, avoiding directories in the whitelist, and creates
 // a tarball of the changed files.
-func (s *Snapshotter) TakeSnapshotFS() (string, error) {
+func (s *Snapshotter) TakeSnapshotFS(reproducible bool) (string, error) {
 	f, err := ioutil.TempFile(snapshotPathPrefix, "")
 	if err != nil {
 		return "", err
@@ -103,7 +104,7 @@ func (s *Snapshotter) TakeSnapshotFS() (string, error) {
 	t := util.NewTar(f)
 	defer t.Close()
 
-	filesToAdd, filesToWhiteOut, err := s.scanFullFilesystem()
+	filesToAdd, filesToWhiteOut, err := s.scanFullFilesystem(reproducible)
 	if err != nil {
 		return "", err
 	}
@@ -115,7 +116,7 @@ func (s *Snapshotter) TakeSnapshotFS() (string, error) {
 	return f.Name(), nil
 }
 
-func (s *Snapshotter) scanFullFilesystem() ([]string, []string, error) {
+func (s *Snapshotter) scanFullFilesystem(reproducible bool) ([]string, []string, error) {
 	logrus.Info("Taking snapshot of full filesystem...")
 
 	// Some of the operations that follow (e.g. hashing) depend on the file system being synced,
@@ -185,6 +186,10 @@ func (s *Snapshotter) scanFullFilesystem() ([]string, []string, error) {
 
 	// Also add parent directories to keep the permission of them correctly.
 	filesToAdd = filesWithParentDirs(filesToAdd)
+
+	if reproducible {
+		sort.Strings(filesToAdd)
+	}
 
 	// Add files to the layered map
 	for _, file := range filesToAdd {

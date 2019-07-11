@@ -224,7 +224,7 @@ func (s *stageBuilder) build() error {
 	}
 	// Take initial snapshot
 	t := timing.Start("Initial FS snapshot")
-	if err := s.snapshotter.Init(); err != nil {
+	if err := s.snapshotter.Init(s.opts.Reproducible); err != nil {
 		return err
 	}
 	timing.DefaultRun.Stop(t)
@@ -290,7 +290,7 @@ func (s *stageBuilder) takeSnapshot(files []string) (string, error) {
 	var err error
 	t := timing.Start("Snapshotting FS")
 	if files == nil || s.opts.SingleSnapshot {
-		snapshot, err = s.snapshotter.TakeSnapshotFS()
+		snapshot, err = s.snapshotter.TakeSnapshotFS(s.opts.Reproducible)
 	} else {
 		// Volumes are very weird. They get snapshotted in the next command.
 		files = append(files, util.Volumes()...)
